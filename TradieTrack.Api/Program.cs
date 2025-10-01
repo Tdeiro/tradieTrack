@@ -1,4 +1,6 @@
 using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
+using TradieTrack.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +14,10 @@ var allowedOrigins = new[] { "http://localhost:5173" };
 builder.Services.AddCors(o => o.AddPolicy("localdev",
     p => p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod())
 );
+
+var cs = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<AppDbContext>(opt =>
+    opt.UseNpgsql(cs));
 
 var app = builder.Build();
 

@@ -1,0 +1,47 @@
+# -------------------------
+# Node.js / Frontend (TradieTrack.Web)
+# -------------------------
+TradieTrack.Web/node_modules/
+TradieTrack.Web/dist/
+TradieTrack.Web/build/
+TradieTrack.Web/.npm/
+TradieTrack.Web/.pnpm/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -------------------------
+# .NET / Backend (TradieTrack.Api)
+# -------------------------
+**/bin/
+**/obj/
+*.user
+*.suo
+*.dbmdl
+*.dbproj.schemaview
+*.sln.docstates
+
+# -------------------------
+# IDE / Editor
+# -------------------------
+.vscode/
+.idea/
+*.swp
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Environment / secrets
+# -------------------------
+.env
+.env.*.local
+
+# -------------------------
+# Docker / Database
+# -------------------------
+postgres_data/

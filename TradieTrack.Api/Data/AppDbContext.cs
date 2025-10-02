@@ -7,7 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<User> Users => Set<User>();
-
+    public DbSet<Customer> Customers => Set<Customer>();
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Organization>(e =>
@@ -26,7 +26,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.FullName).HasMaxLength(200);
             e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
             e.HasOne(x => x.Organization)
-             .WithMany(o => o.Users)
+             .WithMany()
+             .HasForeignKey(x => x.OrganizationId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Customer>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            e.Property(x => x.Email).HasMaxLength(320);
+            e.Property(x => x.Phone).HasMaxLength(40);
+            e.Property(x => x.Address).HasMaxLength(500);
+            e.HasIndex(x => new { x.OrganizationId, x.Email }).HasFilter("\"Email\" IS NOT NULL");
+            e.HasIndex(x => new { x.OrganizationId, x.Phone }).HasFilter("\"Phone\" IS NOT NULL");
+            e.HasOne(x => x.Organization)
+             .WithMany() // ✅ do not point to Users
              .HasForeignKey(x => x.OrganizationId)
              .OnDelete(DeleteBehavior.Cascade);
         });

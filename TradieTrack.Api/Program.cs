@@ -1,11 +1,16 @@
-using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Mvc;                // for [AsParameters]
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+using TradieTrack.Api.Contracts;
 using TradieTrack.Api.Data;
-using Microsoft.AspNetCore.Components.Forms;
+using TradieTrack.Api.Extensions;
 using TradieTrack.Api.Models;
 using TradieTrack.Api.Seed;
 
+
+
 var builder = WebApplication.CreateBuilder(args);
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -49,6 +54,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+
 app.UseCors("localdev");
 
 
@@ -72,6 +78,22 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+// Create org
+app.MapPost("/api/organizations", async (AppDbContext db, string name, string plan = "Free", CancellationToken ct = default) =>
+{
+    if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest("Name is required.");
+    var org = new Organization { Name = name.Trim(), Plan = plan };
+    db.Organizations.Add(org);
+    await db.SaveChangesAsync(ct);
+    return Results.Created($"/api/organizations/{org.Id}", org);
+});
+
+app.MapGet("/api/organizations", (AppDbContext db) =>
+    db.Organizations
+      .OrderBy(o => o.CreatedAt)
+      .Select(o => new { o.Id, o.Name, o.Plan, o.CreatedAt })
+      .ToList());
+
 // Users
 app.MapGet("api/users", async (AppDbContext db) =>
     await db.Users.AsNoTracking().Take(50).ToListAsync());
@@ -85,6 +107,100 @@ app.MapPost("api/users", async (AppDbContext db, User input) =>
     await db.SaveChangesAsync();
     return Results.Created($"/api/users/{input.Id}", input);
 });
+
+
+// / List(paged + search)
+app.MapGet("/api/customers", async (
+    AppDbContext db,
+    [AsParameters] CustomerQuery p,
+    CancellationToken ct) =>
+{
+    var query = db.Customers.AsNoTracking()
+        .Where(c => !c.IsDeleted && c.OrganizationId == p.OrganizationId);
+
+    if (!string.IsNullOrWhiteSpace(p.Q))
+    {
+        var term = p.Q.Trim().ToLower();
+        query = query.Where(c =>
+            (c.Name != null && c.Name.ToLower().Contains(term)) ||
+            (c.Email != null && c.Email.ToLower().Contains(term)) ||
+            (c.Phone != null && c.Phone.ToLower().Contains(term)));
+    }
+
+    query = query.OrderByDescending(c => c.CreatedAt);
+
+    (List<Customer> items, int total) = await query.ToPagedAsync(p.Page, p.PageSize, ct);
+    return Results.Ok(new Paged<Customer>(items, p.Page, p.PageSize, total));
+});
+
+// Get by id
+app.MapGet("/api/customers/{id:guid}", async (
+    AppDbContext db, Guid id, Guid organizationId, CancellationToken ct) =>
+{
+    var c = await db.Customers.AsNoTracking()
+        .FirstOrDefaultAsync(x => x.Id == id && x.OrganizationId == organizationId && !x.IsDeleted, ct);
+
+    return c is null ? Results.NotFound() : Results.Ok(c);
+});
+
+
+// Create
+app.MapPost("/api/customers", async (
+    AppDbContext db, CustomerCreateDto dto, CancellationToken ct) =>
+{
+    if (dto.OrganizationId == Guid.Empty || string.IsNullOrWhiteSpace(dto.Name))
+        return Results.BadRequest("OrganizationId and Name are required.");
+
+    var entity = new Customer
+    {
+        OrganizationId = dto.OrganizationId,
+        Name = dto.Name.Trim(),
+        Email = dto.Email?.Trim(),
+        Phone = dto.Phone?.Trim(),
+        Address = dto.Address?.Trim(),
+    };
+
+    db.Customers.Add(entity);
+    await db.SaveChangesAsync(ct);
+    return Results.Created($"/api/customers/{entity.Id}", entity);
+});
+
+// Update
+app.MapPut("/api/customers/{id:guid}", async (
+    AppDbContext db, Guid id, Guid organizationId, CustomerUpdateDto dto, CancellationToken ct) =>
+{
+    var entity = await db.Customers.FirstOrDefaultAsync(
+        x => x.Id == id && x.OrganizationId == organizationId && !x.IsDeleted, ct);
+
+    if (entity is null) return Results.NotFound();
+    if (string.IsNullOrWhiteSpace(dto.Name)) return Results.BadRequest("Name is required.");
+
+    entity.Name = dto.Name.Trim();
+    entity.Email = dto.Email?.Trim();
+    entity.Phone = dto.Phone?.Trim();
+    entity.Address = dto.Address?.Trim();
+    entity.UpdatedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync(ct);
+    return Results.Ok(entity);
+});
+
+// Soft delete
+app.MapDelete("/api/customers/{id:guid}", async (
+    AppDbContext db, Guid id, Guid organizationId, CancellationToken ct) =>
+{
+    var entity = await db.Customers.FirstOrDefaultAsync(
+        x => x.Id == id && x.OrganizationId == organizationId && !x.IsDeleted, ct);
+
+    if (entity is null) return Results.NotFound();
+
+    entity.IsDeleted = true;
+    entity.DeletedAt = DateTime.UtcNow;
+
+    await db.SaveChangesAsync(ct);
+    return Results.NoContent();
+});
+
 
 app.Run();
 

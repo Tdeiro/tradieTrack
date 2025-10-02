@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TradieTrack.Api.Data;
@@ -11,9 +12,11 @@ using TradieTrack.Api.Data;
 namespace TradieTrack.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251002004629_CustomerTweaks")]
+    partial class CustomerTweaks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -68,7 +71,7 @@ namespace TradieTrack.Api.Migrations
                     b.HasIndex("OrganizationId", "Phone")
                         .HasFilter("\"Phone\" IS NOT NULL");
 
-                    b.ToTable("Customers");
+                    b.ToTable("Customer");
                 });
 
             modelBuilder.Entity("TradieTrack.Api.Models.Organization", b =>
@@ -121,17 +124,12 @@ namespace TradieTrack.Api.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("OrganizationId1")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
 
                     b.HasIndex("OrganizationId");
-
-                    b.HasIndex("OrganizationId1");
 
                     b.ToTable("Users");
                 });
@@ -150,14 +148,10 @@ namespace TradieTrack.Api.Migrations
             modelBuilder.Entity("TradieTrack.Api.Models.User", b =>
                 {
                     b.HasOne("TradieTrack.Api.Models.Organization", "Organization")
-                        .WithMany()
+                        .WithMany("Users")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("TradieTrack.Api.Models.Organization", null)
-                        .WithMany("Users")
-                        .HasForeignKey("OrganizationId1");
 
                     b.Navigation("Organization");
                 });

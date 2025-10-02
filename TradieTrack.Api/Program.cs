@@ -1,6 +1,9 @@
 using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
 using TradieTrack.Api.Data;
+using Microsoft.AspNetCore.Components.Forms;
+using TradieTrack.Api.Models;
+using TradieTrack.Api.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +23,21 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(cs));
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+
+    var shouldSeed =
+        env.IsDevelopment() &&
+        (Environment.GetEnvironmentVariable("SEED")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
+         || args.Contains("--seed"));
+
+    if (shouldSeed)
+        await JsonSeed.RunAsync(db);
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -53,6 +71,20 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+// Users
+app.MapGet("api/users", async (AppDbContext db) =>
+    await db.Users.AsNoTracking().Take(50).ToListAsync());
+
+app.MapPost("api/users", async (AppDbContext db, User input) =>
+{
+    if (input.OrganizationId == Guid.Empty || string.IsNullOrWhiteSpace(input.Email))
+        return Results.BadRequest("OrganizationId and Email are required.");
+
+    db.Users.Add(input);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/users/{input.Id}", input);
+});
 
 app.Run();
 
